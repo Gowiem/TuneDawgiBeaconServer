@@ -10,11 +10,8 @@ import traceback
 from firebase import firebase
 
 LOG_FILE_NAME = 'ibeacon_server.log'
+MINOR_ID_KEY = 'MinorId'
 TUNE_DAWG_MAJOR_ID = 1
-TUNE_DAWG_MINOR_MAP = {
-    '41': 'Toby',
-    '61': 'Mac'
-}
 
 firebase = firebase.FirebaseApplication('https://tunedog.firebaseio.com/', None)
 
@@ -28,11 +25,23 @@ class BeaconPing():
 
 class BeaconServer():
     def __init__(self, timeToCountAbsent, command):
-        self.timeToCountAbsent = timeToCountAbsent
+        self.timeToCountAbsent = int(timeToCountAbsent)
         self.log_file = open(LOG_FILE_NAME, 'w')
         self.command = command
         self.unknown_dawgs = []
         self.dawgs_in_office = {}
+        self.dawg_name_map = self.build_dawg_name_map()
+
+    def build_dawg_name_map(self):
+        result = {}
+        dawgs = firebase.get("/Dogs", None)
+        for name, info in dawgs.iteritems():
+            if MINOR_ID_KEY in info:
+                result[info[MINOR_ID_KEY]] = name
+            else:
+                self.log("%s does not have a minor ID. Please fix that." % name)
+
+        return result
 
     def log(self, msg):
         output = '%s - %s' % (datetime.datetime.now(), msg)
@@ -43,9 +52,10 @@ class BeaconServer():
         ping = BeaconPing(raw_ping)
 
         # Check that we know about this dawg
-        if (ping.minor in TUNE_DAWG_MINOR_MAP):
-            dawg_name = TUNE_DAWG_MINOR_MAP[ping.minor]
+        if (ping.minor in self.dawg_name_map):
+            dawg_name = self.dawg_name_map[ping.minor]
             if (not self.dawgs_in_office.has_key(dawg_name)):
+                self.log("%s is in the Office!" % dawg_name)
                 self.update_dawg_in_office_status(dawg_name, True)
             self.dawgs_in_office[dawg_name] = int(time.time())
         else:
@@ -60,15 +70,16 @@ class BeaconServer():
 
     def check_for_absent_dawgs(self):
         now = int(time.time())
-        for dawg_name, last_seen in self.dawgs_in_office.iteritems():
+        names = self.dawgs_in_office.keys()
+        for name in names:
+            last_seen = self.dawgs_in_office[name]
             last_seen_offset = now - last_seen
             if (last_seen_offset >= self.timeToCountAbsent):
-                del self.dawgs_in_office[dawg_name]
-                self.update_dawg_in_office_status(dawg_name, nil)
+                self.log("%s hasn't been in the office in a while, marking absent." % name)
+                del self.dawgs_in_office[name]
+                self.update_dawg_in_office_status(name, "nil")
 
     def start(self):
-        self.log("Starting to listen for iBeacons...")
-
         self.process = subprocess.Popen(command, stdout=subprocess.PIPE, shell=True)
         while (self.process.poll() is None):
             output = self.process.stdout.readline()
@@ -114,6 +125,7 @@ if __name__ == '__main__':
     beacon_server = BeaconServer(args.absentTime, command)
 
     try:
+        self.log("Starting to listen for iBeacons...")
         beacon_server.start()
     except KeyboardInterrupt:
         beacon_server.exit("User exited the program. Shutting down...")

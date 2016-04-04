@@ -5,9 +5,10 @@ beacon_pings=(
   "uuid3 1 61 -61"
 )
 
+# TOBY!
 echo "uuid3 1 41 -50"
 
-for i in {1..30}
+for i in {1..90}
 do
   sleep 1
   single_ping=${beacon_pings[$RANDOM % ${#beacon_pings[@]} ]}
