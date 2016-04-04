@@ -25,9 +25,9 @@ if [[ $1 == "parse" ]]; then
           POWER=`echo "ibase=16; $POWER" | bc`
           POWER=$[POWER - 256]
           if [[ $2 == "-b" ]]; then
-	    echo "$UUID $MAJOR $MINOR $POWER"
+	           echo "$UUID $MAJOR $MINOR $POWER"
           else
-    	    echo "UUID: $UUID MAJOR: $MAJOR MINOR: $MINOR POWER: $POWER"
+    	       echo "UUID: $UUID MAJOR: $MAJOR MINOR: $MINOR POWER: $POWER"
           fi
         fi
         capturing=""
