@@ -24,9 +24,10 @@ class BeaconPing():
         self.power = parts[3]
 
 class BeaconServer():
-    def __init__(self, timeToCountAbsent, command):
+    def __init__(self, timeToCountAbsent, command, verbose):
         self.timeToCountAbsent = int(timeToCountAbsent)
         self.log_file = open(LOG_FILE_NAME, 'w')
+        self.verbose = verbose
         self.command = command
         self.unknown_dawgs = []
         self.dawgs_in_office = {}
@@ -86,7 +87,9 @@ class BeaconServer():
             if output:
                 output = output.rstrip()
 
-                self.log(output)
+                if self.verbose:
+                    self.log(output)
+
                 self.mark_dawg_in_office(output)
                 self.check_for_absent_dawgs()
 
@@ -115,6 +118,12 @@ if __name__ == '__main__':
                         default=False,
                         help="Flag to determine if we should use the mock script or not.")
 
+    parser.add_argument('-v',
+                        dest='verbose',
+                        required=False,
+                        default=False,
+                        help="Flag to determine if we should log verbosely (each ping).")
+
     args = parser.parse_args()
 
     if (args.testing):
@@ -122,10 +131,10 @@ if __name__ == '__main__':
     else:
         command = ['ibeacon_scan.sh', '-b']
 
-    beacon_server = BeaconServer(args.absentTime, command)
+    beacon_server = BeaconServer(args.absentTime, command, args.verbose)
 
     try:
-        self.log("Starting to listen for iBeacons...")
+        beacon_server.log("Starting to listen for iBeacons...")
         beacon_server.start()
     except KeyboardInterrupt:
         beacon_server.exit("User exited the program. Shutting down...")
