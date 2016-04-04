@@ -8,6 +8,10 @@ import time
 import argparse
 import traceback
 from firebase import firebase
+import logging
+
+logger = logging.getLogger('iBeaconServer')
+logger.setLevel(logging.INFO)
 
 LOG_FILE_NAME = 'ibeacon_server.log'
 MINOR_ID_KEY = 'MinorId'
@@ -24,10 +28,8 @@ class BeaconPing():
         self.power = parts[3]
 
 class BeaconServer():
-    def __init__(self, timeToCountAbsent, command, verbose):
+    def __init__(self, timeToCountAbsent, command):
         self.timeToCountAbsent = int(timeToCountAbsent)
-        self.log_file = open(LOG_FILE_NAME, 'w')
-        self.verbose = verbose
         self.command = command
         self.unknown_dawgs = []
         self.dawgs_in_office = {}
@@ -40,14 +42,9 @@ class BeaconServer():
             if MINOR_ID_KEY in info:
                 result[info[MINOR_ID_KEY]] = name
             else:
-                self.log("%s does not have a minor ID. Please fix that." % name)
+                logger.info("%s does not have a minor ID. Please fix that." % name)
 
         return result
-
-    def log(self, msg):
-        output = '%s - %s' % (datetime.datetime.now(), msg)
-        print(output)
-        self.log_file.write(output)
 
     def mark_dawg_in_office(self, raw_ping):
         ping = BeaconPing(raw_ping)
@@ -56,13 +53,13 @@ class BeaconServer():
         if (ping.minor in self.dawg_name_map):
             dawg_name = self.dawg_name_map[ping.minor]
             if (not self.dawgs_in_office.has_key(dawg_name)):
-                self.log("%s is in the Office!" % dawg_name)
+                logger.info("%s is in the Office!" % dawg_name)
                 self.update_dawg_in_office_status(dawg_name, True)
             self.dawgs_in_office[dawg_name] = int(time.time())
         else:
             if (not ping.minor in self.unknown_dawgs):
                 self.unknown_dawgs.append(ping.minor)
-                self.log("Unknown Dawg! ping.minor: %s" % ping.minor)
+                logger.info("Unknown Dawg! ping.minor: %s" % ping.minor)
 
     def update_dawg_in_office_status(self, dawg_name, status):
         dawg = firebase.get("/Dogs", dawg_name)
@@ -76,7 +73,7 @@ class BeaconServer():
             last_seen = self.dawgs_in_office[name]
             last_seen_offset = now - last_seen
             if (last_seen_offset >= self.timeToCountAbsent):
-                self.log("%s hasn't been in the office in a while, marking absent." % name)
+                logger.info("%s hasn't been in the office in a while, marking absent." % name)
                 del self.dawgs_in_office[name]
                 self.update_dawg_in_office_status(name, "nil")
 
@@ -87,8 +84,7 @@ class BeaconServer():
             if output:
                 output = output.rstrip()
 
-                if self.verbose:
-                    self.log(output)
+                logger.debug(output)
 
                 self.mark_dawg_in_office(output)
                 self.check_for_absent_dawgs()
@@ -97,7 +93,7 @@ class BeaconServer():
         self.exit("Subprocess done gone closed on us. That's a wrap folks!")
 
     def exit(self, msg):
-        self.log(msg)
+        logger.info(msg)
         if (self.process is not None):
             self.process.kill()
         sys.exit(0)
@@ -115,26 +111,51 @@ if __name__ == '__main__':
     parser.add_argument('-t',
                         dest='testing',
                         required=False,
+                        action='store_true',
                         default=False,
                         help="Flag to determine if we should use the mock script or not.")
 
     parser.add_argument('-v',
                         dest='verbose',
                         required=False,
+                        action='store_true',
                         default=False,
                         help="Flag to determine if we should log verbosely (each ping).")
 
     args = parser.parse_args()
+
+    ## Setup Logger
+    ################
+    if (args.verbose):
+        logging_level = logging.DEBUG
+    else:
+        logging_level = logging.INFO
+
+    # create file handler which logs even debug messages
+    fh = logging.FileHandler(LOG_FILE_NAME)
+    fh.setLevel(logging_level)
+
+    # create console handler with a higher log level
+    ch = logging.StreamHandler(sys.stdout)
+    ch.setLevel(logging_level)
+
+    formatter = logging.Formatter('%(asctime)s - %(name)s - %(levelname)s - %(message)s')
+    ch.setFormatter(formatter)
+    fh.setFormatter(formatter)
+
+    logger.addHandler(ch)
+    logger.addHandler(fh)
+    logger.setLevel(logging_level)
 
     if (args.testing):
         command = ['ibeacon_scan_mock.sh']
     else:
         command = ['ibeacon_scan.sh', '-b']
 
-    beacon_server = BeaconServer(args.absentTime, command, args.verbose)
+    beacon_server = BeaconServer(args.absentTime, command)
 
     try:
-        beacon_server.log("Starting to listen for iBeacons...")
+        logger.info("Starting to listen for iBeacons...")
         beacon_server.start()
     except KeyboardInterrupt:
         beacon_server.exit("User exited the program. Shutting down...")
