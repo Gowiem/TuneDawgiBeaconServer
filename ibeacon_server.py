@@ -92,7 +92,8 @@ class BeaconServer():
         self.exit("Subprocess done gone closed on us. That's a wrap folks!")
 
     def reset_bluetooth_module(self):
-        subprocess.call(["sudo", "hciconfig", "hci0", "reset"])
+        return_code = subprocess.call(["sudo", "hciconfig", "hci0", "reset"], shell=True)
+        logger.info("Tried to reset the bluetooth module hci0. Return code: " + str(return_code))
 
     def exit(self, msg):
         logger.info(msg)
