@@ -149,7 +149,7 @@ if __name__ == '__main__':
     if (args.testing):
         command = ['./ibeacon_scan_mock.sh']
     else:
-        command = ['./ibeacon_scan.sh', '-b']
+        command = ['./ibeacon_scan.sh -b']
 
     beacon_server = BeaconServer(args.absentTime, command)
 
