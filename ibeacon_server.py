@@ -14,7 +14,7 @@ logger.setLevel(logging.INFO)
 
 LOG_FILE_NAME = 'ibeacon_server.log'
 MINOR_ID_KEY = 'MinorId'
-TUNE_DAWG_MAJOR_ID = 1
+TUNE_DAWG_MAJOR_ID = 15229
 
 firebase = firebase.FirebaseApplication('https://tunedog.firebaseio.com/', None)
 
