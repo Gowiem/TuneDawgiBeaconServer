@@ -1,4 +1,3 @@
-
 #!/usr/bin/env python
 
 import subprocess
@@ -148,9 +147,9 @@ if __name__ == '__main__':
     logger.setLevel(logging_level)
 
     if (args.testing):
-        command = ['ibeacon_scan_mock.sh']
+        command = ['./ibeacon_scan_mock.sh']
     else:
-        command = ['ibeacon_scan.sh', '-b']
+        command = ['./ibeacon_scan.sh', '-b']
 
     beacon_server = BeaconServer(args.absentTime, command)
 
