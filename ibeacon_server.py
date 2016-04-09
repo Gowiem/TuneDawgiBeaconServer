@@ -91,6 +91,9 @@ class BeaconServer():
         self.process = None
         self.exit("Subprocess done gone closed on us. That's a wrap folks!")
 
+    def reset_bluetooth_module(self):
+        subprocess.call(["sudo", "hciconfig", "hci0", "reset"])
+
     def exit(self, msg):
         logger.info(msg)
         if (self.process is not None):
@@ -154,6 +157,11 @@ if __name__ == '__main__':
     beacon_server = BeaconServer(args.absentTime, command)
 
     try:
+        # Reset the bluetooth module each time we start. This fixes issue with
+        # it getting into a funky state where pings don't come across.
+        if (not args.testing):
+            beacon_server.reset_bluetooth_module()
+
         logger.info("Starting to listen for iBeacons...")
         beacon_server.start()
     except KeyboardInterrupt:
