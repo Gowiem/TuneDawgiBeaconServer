@@ -8,6 +8,8 @@ import argparse
 import traceback
 from firebase import firebase
 import logging
+import json
+import urllib2
 
 logger = logging.getLogger('iBeaconServer')
 logger.setLevel(logging.INFO)
@@ -15,6 +17,9 @@ logger.setLevel(logging.INFO)
 LOG_FILE_NAME = 'ibeacon_server.log'
 MINOR_ID_KEY = 'MinorId'
 TUNE_DAWG_MAJOR_ID = 15229
+
+APPBOY_SEND_ENDPOINT = "https://api.appboy.com/campaigns/trigger/send"
+APPBOY_APP_ID = "669b7e12-fb53-4622-a116-da620b9835e1"
 
 firebase = firebase.FirebaseApplication('https://tunedog.firebaseio.com/', None)
 
@@ -59,14 +64,18 @@ class BeaconServer():
             if (not self.dawgs_in_office.has_key(dawg_name)):
                 logger.info("%s is in the Office!" % dawg_name)
                 self.update_dawg_in_office_status(dawg_name, True)
+                self.send_notification_for_dawg_subscribers(dawg_name)
             self.dawgs_in_office[dawg_name] = int(time.time())
         else:
             if (not ping.minor in self.unknown_dawgs):
                 self.unknown_dawgs.append(ping.minor)
                 logger.info("Unknown Dawg! ping.minor: %s" % ping.minor)
 
+    def get_dawg(self, dawg_name):
+        return firebase.get("/Dogs", dawg_name)
+
     def update_dawg_in_office_status(self, dawg_name, status):
-        dawg = firebase.get("/Dogs", dawg_name)
+        dawg = self.get_dawg(dawg_name)
         dawg['IsHere'] = status
         firebase.put("/Dogs", dawg_name, dawg)
 
@@ -99,6 +108,22 @@ class BeaconServer():
     def reset_bluetooth_module(self):
         return_code = subprocess.call(["sudo hciconfig hci0 reset"], shell=True)
         logger.info("Tried to reset the bluetooth module hci0. Return code: " + str(return_code))
+
+    def send_notification_for_dawg_subscribers(self, dawg_name):
+        dawg = self.get_dawg(dawg_name)
+
+        if not 'CampaignId' in dawg:
+            logger.warn("Unable to notify %s due to unknown CampaignId." % dawg_name)
+            return
+
+        data = { "app_group_id": APPBOY_APP_ID, "campaign_id": dawg['CampaignId'] }
+
+        req = urllib2.Request(APPBOY_SEND_ENDPOINT)
+        req.add_header('Content-Type', 'application/json')
+
+        response = urllib2.urlopen(req, json.dumps(data))
+
+        logger.info("AppBoy Response: %s" % response.read())
 
     def exit(self, msg):
         logger.info(msg)
