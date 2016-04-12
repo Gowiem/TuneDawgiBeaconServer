@@ -16,6 +16,7 @@ logger.setLevel(logging.INFO)
 
 LOG_FILE_NAME = 'ibeacon_server.log'
 MINOR_ID_KEY = 'MinorId'
+CAMPAIGN_ID_KEY = 'CampaignId'
 TUNE_DAWG_MAJOR_ID = 15229
 
 APPBOY_SEND_ENDPOINT = "https://api.appboy.com/campaigns/trigger/send"
@@ -57,6 +58,9 @@ class BeaconServer():
 
     def mark_dawg_in_office(self, raw_ping):
         ping = BeaconPing(raw_ping)
+
+        if not ping.major == TUNE_DAWG_MAJOR_ID:
+            return
 
         # Check that we know about this dawg
         if (ping.minor in self.dawg_name_map):
@@ -112,11 +116,11 @@ class BeaconServer():
     def send_notification_for_dawg_subscribers(self, dawg_name):
         dawg = self.get_dawg(dawg_name)
 
-        if not 'CampaignId' in dawg:
+        if not CAMPAIGN_ID_KEY in dawg:
             logger.warn("Unable to notify %s due to unknown CampaignId." % dawg_name)
             return
 
-        data = { "app_group_id": APPBOY_APP_ID, "campaign_id": dawg['CampaignId'] }
+        data = { "app_group_id": APPBOY_APP_ID, "campaign_id": dawg[CAMPAIGN_ID_KEY] }
 
         req = urllib2.Request(APPBOY_SEND_ENDPOINT)
         req.add_header('Content-Type', 'application/json')
