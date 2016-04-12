@@ -17,7 +17,7 @@ logger.setLevel(logging.INFO)
 LOG_FILE_NAME = 'ibeacon_server.log'
 MINOR_ID_KEY = 'MinorId'
 CAMPAIGN_ID_KEY = 'CampaignId'
-TUNE_DAWG_MAJOR_ID = 15229
+TUNE_DAWG_MAJOR_ID = "15229"
 
 APPBOY_SEND_ENDPOINT = "https://api.appboy.com/campaigns/trigger/send"
 APPBOY_APP_ID = "669b7e12-fb53-4622-a116-da620b9835e1"
