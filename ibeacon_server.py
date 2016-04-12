@@ -45,6 +45,11 @@ class BeaconServer():
 
         return result
 
+    def reset_all_dawgs(self):
+        names = self.dawg_name_map.values()
+        for name in names:
+            self.update_dawg_in_office_status(name, "nil")
+
     def mark_dawg_in_office(self, raw_ping):
         ping = BeaconPing(raw_ping)
 
@@ -158,10 +163,13 @@ if __name__ == '__main__':
     beacon_server = BeaconServer(args.absentTime, command)
 
     try:
-        # Reset the bluetooth module each time we start. This fixes issue with
-        # it getting into a funky state where pings don't come across.
+        # 1. Reset the bluetooth module each time we start. This fixes issue
+        # with it getting into a funky state where pings don't come across.
+        # 2. Reset all the dawgs. If they're in the office we should pick them
+        # immediately and set their state.
         if (not args.testing):
             beacon_server.reset_bluetooth_module()
+            beacon_server.reset_all_dawgs()
 
         logger.info("Starting to listen for iBeacons...")
         beacon_server.start()
