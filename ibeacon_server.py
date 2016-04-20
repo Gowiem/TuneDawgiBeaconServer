@@ -1,6 +1,8 @@
 #!/usr/bin/env python
 
 import subprocess
+import os
+import signal
 import sys
 import datetime
 import time
@@ -33,8 +35,9 @@ class BeaconPing():
         self.power = parts[3]
 
 class BeaconServer():
-    def __init__(self, timeToCountAbsent, command):
-        self.timeToCountAbsent = int(timeToCountAbsent)
+    def __init__(self, time_to_count_absent, restart_time, command):
+        self.time_to_count_absent = int(time_to_count_absent)
+        self.restart_time = int(restart_time)
         self.command = command
         self.unknown_dawgs = []
         self.dawgs_in_office = {}
@@ -89,13 +92,14 @@ class BeaconServer():
         for name in names:
             last_seen = self.dawgs_in_office[name]
             last_seen_offset = now - last_seen
-            if (last_seen_offset >= self.timeToCountAbsent):
+            if (last_seen_offset >= self.time_to_count_absent):
                 logger.info("%s hasn't been in the office in a while, marking absent." % name)
                 del self.dawgs_in_office[name]
                 self.update_dawg_in_office_status(name, "nil")
 
     def start(self):
-        self.process = subprocess.Popen(command, stdout=subprocess.PIPE, shell=True)
+        self.process = self.build_subprocess()
+        running_time = time.time()
         while (self.process.poll() is None):
             output = self.process.stdout.readline()
             if output:
@@ -104,14 +108,23 @@ class BeaconServer():
                 logger.debug(output)
 
                 self.mark_dawg_in_office(output)
+
+            if ((time.time() - running_time) >= self.restart_time):
+                logger.info("Restarting process...")
+                running_time = time.time()
+
+                os.kill(self.process.pid, signal.SIGINT)
+                self.process = self.build_subprocess()
+
                 self.check_for_absent_dawgs()
 
         self.process = None
         self.exit("Subprocess done gone closed on us. That's a wrap folks!")
 
-    def reset_bluetooth_module(self):
+    def build_subprocess(self):
         return_code = subprocess.call(["sudo hciconfig hci0 reset"], shell=True)
         logger.info("Tried to reset the bluetooth module hci0. Return code: " + str(return_code))
+        return subprocess.Popen(self.command, stdout=subprocess.PIPE, shell=True)
 
     def send_notification_for_dawg_subscribers(self, dawg_name):
         dawg = self.get_dawg(dawg_name)
@@ -140,10 +153,16 @@ if __name__ == '__main__':
     parser = argparse.ArgumentParser()
 
     parser.add_argument('-a',
-                        dest='absentTime',
+                        dest='absent_time',
                         required=False,
                         default=3600, # One hour
                         help="How long to wait till marking a seen dawg as absent.")
+
+    parser.add_argument('-r',
+                        dest='restart_time',
+                        required=False,
+                        default=600, # 10 minutes
+                        help="How long to wait till restarting the scan process.")
 
     parser.add_argument('-t',
                         dest='testing',
@@ -189,15 +208,13 @@ if __name__ == '__main__':
     else:
         command = ['./ibeacon_scan.sh -b']
 
-    beacon_server = BeaconServer(args.absentTime, command)
+    beacon_server = BeaconServer(args.absent_time, args.restart_time, command)
 
     try:
-        # 1. Reset the bluetooth module each time we start. This fixes issue
-        # with it getting into a funky state where pings don't come across.
-        # 2. Reset all the dawgs. If they're in the office we should pick them
+
+        # Reset all the dawgs. If they're in the office we should pick them
         # immediately and set their state.
         if (not args.testing):
-            beacon_server.reset_bluetooth_module()
             beacon_server.reset_all_dawgs()
 
         logger.info("Starting to listen for iBeacons...")
